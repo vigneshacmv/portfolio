@@ -1,92 +1,68 @@
-const html = document.documentElement;
-const canvas = document.getElementById("hero-lightpass");
+const canvas = document.getElementById("animationCanvas");
 const context = canvas.getContext("2d");
 
 const frameCount = 240;
-const currentFrame = index => (
-  `./frames/ezgif-frame-${index.toString().padStart(3, '0')}.jpg`
-);
-
-const preloadImages = () => {
-  for (let i = 1; i <= frameCount; i++) {
-    const img = new Image();
-    img.src = currentFrame(i);
-  }
+const images = [];
+const imageSeq = {
+    frame: 0
 };
 
-const img = new Image();
-img.src = currentFrame(1);
-canvas.width = 1158;
-canvas.height = 770;
-img.onload = function() {
-  context.drawImage(img, 0, 0);
+// Set canvas size
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener("resize", resizeCanvas);
+
+// Generate image path with 3-digit padding
+function currentFrame(index) {
+    const paddedIndex = String(index).padStart(3, '0');
+    return `frames/ezgif-frame-${paddedIndex}.jpg`;
 }
 
-const updateImage = index => {
-  img.src = currentFrame(index);
-  context.drawImage(img, 0, 0);
+// Preload images
+for (let i = 1; i <= frameCount; i++) {
+    const img = new Image();
+    img.src = currentFrame(i);
+    images.push(img);
 }
 
-window.addEventListener('scroll', () => {  
-  const scrollTop = html.scrollTop;
-  const maxScrollTop = html.scrollHeight - window.innerHeight;
-  const scrollFraction = scrollTop / maxScrollTop;
-  const frameIndex = Math.min(
-    frameCount - 1,
-    Math.ceil(scrollFraction * frameCount)
-  );
-  
-  requestAnimationFrame(() => updateImage(frameIndex + 1));
-});
+// Draw image
+function drawImage(img) {
+    context.clearRect(0, 0, canvas.width, canvas.height);
 
-preloadImages();
+    const scale = Math.max(
+        canvas.width / img.width,
+        canvas.height / img.height
+    );
 
-// --- CHATBOT LOGIC ---
+    const x = (canvas.width / 2) - (img.width / 2) * scale;
+    const y = (canvas.height / 2) - (img.height / 2) * scale;
 
-const chatToggle = document.getElementById('chat-toggle');
-const chatWidget = document.getElementById('chat-widget');
-const sendBtn = document.getElementById('send-btn');
-const userInput = document.getElementById('user-input');
-const chatBody = document.getElementById('chat-body');
-
-chatToggle.addEventListener('click', () => {
-    chatWidget.style.display = chatWidget.style.display === 'flex' ? 'none' : 'flex';
-});
-
-const API_KEY = "YOUR_GEMINI_API_KEY"; // REPLACE THIS
-
-async function getChatResponse(message) {
-    const systemPrompt = `You are an assistant for Vignesh Arikrishnan. 
-    Answer questions ONLY using this info: 
-    Electronics & Comm Engineering student at Govt College Tirunelveli (Anna University). 
-    Skills: Python, C, Embedded C, Arduino, ThingsBoard, Networking, IoT. 
-    CGPA: 84%. Projects: Obstacle Avoidance Robot (Arduino), AQI Sensor Simulation. 
-    Email: vignesharikrishnanacmv@gmail.com. Phone: 8015547704.
-    If the answer isn't here, say "I'm sorry, I don't have that information."`;
-
-    try {
-        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: systemPrompt + "\n\nUser Question: " + message }] }]
-            })
-        });
-        const data = await response.json();
-        return data.candidates[0].content.parts[0].text;
-    } catch (error) {
-        return "Offline. Please try again later.";
-    }
+    context.drawImage(
+        img,
+        x,
+        y,
+        img.width * scale,
+        img.height * scale
+    );
 }
 
-sendBtn.addEventListener('click', async () => {
-    const text = userInput.value;
-    if (!text) return;
+// Initial frame
+images[0].onload = () => {
+    drawImage(images[0]);
+};
 
-    chatBody.innerHTML += `<div class="user-msg">${text}</div>`;
-    userInput.value = '';
-    
-    const response = await getChatResponse(text);
-    chatBody.innerHTML += `<div class="bot-msg">${response}</div>`;
-    chatBody.scrollTop = chatBody.scrollHeight;
+// Scroll animation
+window.addEventListener("scroll", () => {
+    const scrollTop = window.scrollY;
+    const maxScroll = document.body.scrollHeight - window.innerHeight;
+    const scrollFraction = scrollTop / maxScroll;
+    const frameIndex = Math.min(
+        frameCount - 1,
+        Math.floor(scrollFraction * frameCount)
+    );
+
+    requestAnimationFrame(() => drawImage(images[frameIndex]));
 });
