@@ -1,83 +1,92 @@
-// --- 1. SCROLL ANIMATION LOGIC ---
-const canvas = document.getElementById("animation-canvas");
+const html = document.documentElement;
+const canvas = document.getElementById("hero-lightpass");
 const context = canvas.getContext("2d");
-
-canvas.width = window.innerWidth;
-canvas.height = window.innerHeight;
 
 const frameCount = 240;
 const currentFrame = index => (
-  `frames/ezgif-frame-${index.toString().padStart(3, '0')}.jpg`
+  `./frames/ezgif-frame-${index.toString().padStart(3, '0')}.jpg`
 );
 
-const images = [];
-const frameIndex = { frame: 0 };
-
-// Preload images
-for (let i = 1; i <= frameCount; i++) {
-  const img = new Image();
-  img.src = currentFrame(i);
-  images.push(img);
-}
-
-const render = () => {
-  const scrollFraction = window.scrollY / (document.body.scrollHeight - window.innerHeight);
-  const index = Math.min(frameCount - 1, Math.floor(scrollFraction * frameCount));
-  
-  if (images[index]) {
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    context.drawImage(images[index], 0, 0, canvas.width, canvas.height);
+const preloadImages = () => {
+  for (let i = 1; i <= frameCount; i++) {
+    const img = new Image();
+    img.src = currentFrame(i);
   }
 };
 
-window.addEventListener("scroll", render);
-images[0].onload = render;
+const img = new Image();
+img.src = currentFrame(1);
+canvas.width = 1158;
+canvas.height = 770;
+img.onload = function() {
+  context.drawImage(img, 0, 0);
+}
 
-// --- 2. CHATBOT LOGIC ---
-const SYSTEM_PROMPT = `
-You are a career assistant for Vignesh Arikrishnan[cite: 1]. 
-STRICT RULE: Answer ONLY using information from the following context:
-- Education: Pursuing B.E.(E.C.E) at Government College of Engineering, Tirunelveli (2027).
-- Technical Strengths: Python, C, Embedded C, Excel[cite: 7].
-- Projects: Obstacle Avoidance Robot (Arduino), AQI Sensor Simulation (Python/ThingsBoard).
-- Skills: Problem solving, quick learner, effective communicator[cite: 9].
-- Languages: Tamil (Native), English (Professional)[cite: 19, 21].
-If the user asks something NOT in this list, politely decline to answer.
-`;
+const updateImage = index => {
+  img.src = currentFrame(index);
+  context.drawImage(img, 0, 0);
+}
 
-const API_KEY = "YOUR_GEMINI_API_KEY"; // Replace with your actual key
+window.addEventListener('scroll', () => {  
+  const scrollTop = html.scrollTop;
+  const maxScrollTop = html.scrollHeight - window.innerHeight;
+  const scrollFraction = scrollTop / maxScrollTop;
+  const frameIndex = Math.min(
+    frameCount - 1,
+    Math.ceil(scrollFraction * frameCount)
+  );
+  
+  requestAnimationFrame(() => updateImage(frameIndex + 1));
+});
 
-document.getElementById('send-btn').addEventListener('click', async () => {
-    const inputField = document.getElementById('user-input');
-    const userText = inputField.value;
-    if (!userText) return;
+preloadImages();
 
-    appendMessage('User', userText);
-    inputField.value = '';
+// --- CHATBOT LOGIC ---
+
+const chatToggle = document.getElementById('chat-toggle');
+const chatWidget = document.getElementById('chat-widget');
+const sendBtn = document.getElementById('send-btn');
+const userInput = document.getElementById('user-input');
+const chatBody = document.getElementById('chat-body');
+
+chatToggle.addEventListener('click', () => {
+    chatWidget.style.display = chatWidget.style.display === 'flex' ? 'none' : 'flex';
+});
+
+const API_KEY = "YOUR_GEMINI_API_KEY"; // REPLACE THIS
+
+async function getChatResponse(message) {
+    const systemPrompt = `You are an assistant for Vignesh Arikrishnan. 
+    Answer questions ONLY using this info: 
+    Electronics & Comm Engineering student at Govt College Tirunelveli (Anna University). 
+    Skills: Python, C, Embedded C, Arduino, ThingsBoard, Networking, IoT. 
+    CGPA: 84%. Projects: Obstacle Avoidance Robot (Arduino), AQI Sensor Simulation. 
+    Email: vignesharikrishnanacmv@gmail.com. Phone: 8015547704.
+    If the answer isn't here, say "I'm sorry, I don't have that information."`;
 
     try {
         const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                contents: [{
-                    parts: [{ text: SYSTEM_PROMPT + "\nUser Question: " + userText }]
-                }]
+                contents: [{ parts: [{ text: systemPrompt + "\n\nUser Question: " + message }] }]
             })
         });
-
         const data = await response.json();
-        const botText = data.candidates[0].content.parts[0].text;
-        appendMessage('Bot', botText);
+        return data.candidates[0].content.parts[0].text;
     } catch (error) {
-        appendMessage('Bot', "Error connecting to AI.");
+        return "Offline. Please try again later.";
     }
-});
-
-function appendMessage(sender, text) {
-    const history = document.getElementById('chat-history');
-    const msg = document.createElement('div');
-    msg.innerHTML = `<strong>${sender}:</strong> ${text}`;
-    history.appendChild(msg);
-    history.scrollTop = history.scrollHeight;
 }
+
+sendBtn.addEventListener('click', async () => {
+    const text = userInput.value;
+    if (!text) return;
+
+    chatBody.innerHTML += `<div class="user-msg">${text}</div>`;
+    userInput.value = '';
+    
+    const response = await getChatResponse(text);
+    chatBody.innerHTML += `<div class="bot-msg">${response}</div>`;
+    chatBody.scrollTop = chatBody.scrollHeight;
+});
